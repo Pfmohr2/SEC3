@@ -1,0 +1,8 @@
+{
+    "name": "SEC Aggregation Script",
+    "description": "Task script for SEC Aggregation",
+    "namespace": "{{ NAMESPACE }}",
+    "slug": "sec_aggregation_script",
+    "version": "{{ SCRIPT_VERSION }}",
+    "type": "task-script"
+}

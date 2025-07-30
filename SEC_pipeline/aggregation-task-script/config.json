@@ -1,0 +1,10 @@
+{
+    "language": "python",
+    "runtime": "python3.11",
+    "functions": [
+        {
+            "slug": "sec_file_aggregation",
+            "function": "main.main"
+        }
+    ]
+}

@@ -1,0 +1,31 @@
+protocolSchema: "v3"
+name: "SEC Aggregation Protocol"
+description: "SEC Aggregation Protocol"
+namespace: "{{ NAMESPACE }}"
+version: "{{ PROTOCOL_VERSION }}"
+slug: "sec_aggregation_protocol"
+type: "protocol"
+
+config:
+  TheoreticalValue:
+    label: "Theoretical Value"
+    default: "{{ THEORETICAL_VALUE }}"
+    type: "string"
+    required: true
+  StandardValue:
+    label: "Standard Value"
+    type: "string"
+    default: "{{ STANDARD_VALUE }}"
+    required: true
+
+steps:
+  - id: aggregate_files
+    task:
+      namespace: "{{ NAMESPACE }}"
+      slug: "sec_aggregation_script"
+      version: "{{ SCRIPT_VERSION }}"
+      function: sec_file_aggregation
+    input:
+      input_file_pointer: $( workflow.inputFile )
+      theoretical_value: $( config.TheoreticalValue )
+      standard_value: $( config.StandardValue )
