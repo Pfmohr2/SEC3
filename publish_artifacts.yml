@@ -1,0 +1,77 @@
+name: Publish Artifacts
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Environment to run the workflow against"
+        type: string
+        required: true
+      pipeline:
+        description: "Top-level use case or pipeline folder name containing the task script, protocol, and/or IDS folders"
+        type: string
+        required: true
+    secrets:
+      AUTH_TOKEN:
+        required: true
+
+jobs:
+  deploy-to-tdp:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      TDP_API_URL: ${{ vars.TETRA_API_URL }}
+      TDP_ORG: ${{ vars.ORG }}
+      DEPLOY_ENV: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Display Python version - before
+        run: python -c "import sys; print(sys.version)"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          # Semantic version range syntax or exact version of a Python version
+          python-version: ">=3.11 <3.12"
+      # You can test your matrix by printing the current Python version
+      - name: Display Python version - after
+        run: python -c "import sys; print(sys.version)"
+
+      - name: Render templates
+        run: |
+          pip install jinja2
+          pip install python-dotenv
+          export PYTHONPATH="${{ github.workspace }}"
+          python scripts/render_templates.py
+
+      - name: Deploy to TDP
+        env:
+          AUTH_JSON: '{"api_url": "${{ env.TDP_API_URL }}", "auth_token": "${{ secrets.AUTH_TOKEN }}","org": "${{ env.TDP_ORG }}", "ignore_ssl": "false"}'
+        run: |
+          touch auth.json
+          echo $AUTH_JSON
+          echo "$AUTH_JSON" >> ../auth.json
+          cat auth.json
+          python -m pip install --upgrade pip
+          pip install pipenv
+          pip install tetrascience-cli
+
+          echo "About to deploy the aggregation task script"
+          echo 'ts-cli publish --type task-script "${{ github.workspace }}/${{ inputs.pipeline }}/aggregation-task-script" -c ../auth.json -f --no-verify'
+          ts-cli publish --type task-script "${{ github.workspace }}/${{ inputs.pipeline }}/aggregation-task-script" -c ../auth.json -f --no-verify
+
+          echo "About to deploy the aggregation protocol"
+          echo 'ts-cli publish --type protocol "${{ github.workspace }}/${{ inputs.pipeline }}/aggregation-protocol" -c ../auth.json -f --no-verify'
+          ts-cli publish --type protocol "${{ github.workspace }}/${{ inputs.pipeline }}/aggregation-protocol" -c ../auth.json -f --no-verify
+
+      - name: Run all pipeline scripts
+        run: |
+          export PYTHONPATH="${{ github.workspace }}"
+          echo "Deploying aggregation pipeline"
+          python ${{ github.workspace }}/${{ inputs.pipeline }}/pipelines/sec_aggregation_pipeline.py
+          echo "Sleeping for 5 seconds..."
+          sleep 5
+          echo "Deploying fla pipeline"
+          python ${{ github.workspace }}/${{ inputs.pipeline }}/pipelines/sec_push_to_fla_pipeline.py
+        env:
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          # NAMESPACE: ${{ vars.NAMESPACE }}

@@ -1,0 +1,58 @@
+name: Deploy SSP to TDP
+run-name: Deploying SSP to TDP off of ${{ github.ref_name }}
+
+on:
+  # push:
+  #   branches:
+  #     - "main"
+  #     - "qa"
+  #     - "dev"
+  #     - "feature/*"
+  workflow_dispatch:
+    
+
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+
+jobs:
+  deploy_dev:
+    name: Deploy Development - ${{ matrix.pipeline }}
+    if: |
+      github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/heads/feature/')
+    strategy:
+      matrix:
+        pipeline:
+          - SEC_pipeline
+    uses: ./.github/workflows/publish_artifacts.yml
+    with:
+      environment: dev
+      pipeline: ${{ matrix.pipeline }}
+    secrets:
+      AUTH_TOKEN: ${{ secrets.DEV_AUTH_TOKEN }}
+  deploy_qa:
+    name: Deploy QA - ${{ matrix.pipeline }}
+    if: github.ref == 'refs/heads/qa'
+    strategy:
+      matrix:
+        pipeline:
+          - SEC_pipeline
+    uses: ./.github/workflows/publish_artifacts.yml
+    with:
+      environment: qa
+      pipeline: ${{ matrix.pipeline }}
+    secrets:
+      AUTH_TOKEN: ${{ secrets.QA_AUTH_TOKEN }}
+  deploy_prod:
+    name: Deploy Production - ${{ matrix.pipeline }}
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        pipeline:
+          - SEC_pipeline
+    uses: ./.github/workflows/publish_artifacts.yml
+    with:
+      environment: prod
+      pipeline: ${{ matrix.pipeline }}
+    secrets:
+      AUTH_TOKEN: ${{ secrets.PROD_AUTH_TOKEN }}
