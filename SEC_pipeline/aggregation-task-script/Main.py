@@ -31,6 +31,8 @@ from queries import BASE_QUERY
 from fpdf import FPDF
 import numpy as np
 import sys  # Ensure sys is imported for sys.exit(0)
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
 
 # -----------------------------------------------------------------------------
 # Extract peaks to DataFrame
@@ -717,6 +719,187 @@ def save_csv(df: pd.DataFrame, output_file_name: str, context, logger) -> None:
     )
 
 
+def save_system_suitability_to_excel(
+    df_check_standards: pd.DataFrame,
+    df_standard_rsd: pd.DataFrame,
+    output_file_name: str,
+    context,
+    logger
+) -> None:
+    """
+    Save check standards and system suitability checks to an Excel file.
+
+    Args:
+        df_check_standards (pd.DataFrame): DataFrame containing check standards data
+        df_standard_rsd (pd.DataFrame): DataFrame containing standard RSD data
+        output_file_name (str): Name of the output file
+        context: Context object for file operations
+        logger: Logger object for logging messages
+    """
+    try:
+        # Create a new workbook
+        wb = Workbook()
+
+        # Sheet 1: Check Standards
+        ws1 = wb.active
+        ws1.title = "Check Standards"
+
+        # Add header styling
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+
+        # Write Check Standards data
+        ws1.append(["Check Standards - % Recovery"])
+        ws1["A1"].font = Font(bold=True, size=14)
+        ws1.append([])  # Empty row
+
+        # Write column headers
+        headers = df_check_standards.columns.tolist()
+        ws1.append(headers)
+        for cell in ws1[3]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+        # Write data rows
+        for _, row in df_check_standards.iterrows():
+            ws1.append(row.tolist())
+
+        # Auto-adjust column widths
+        for column in ws1.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws1.column_dimensions[column_letter].width = adjusted_width
+
+        # Sheet 2: System Suitability
+        ws2 = wb.create_sheet(title="System Suitability")
+
+        ws2.append(["System Suitability Checks"])
+        ws2["A1"].font = Font(bold=True, size=14)
+        ws2.append([])  # Empty row
+
+        # Write Standard RSD data
+        ws2.append(["Standard RSD Check"])
+        ws2["A3"].font = Font(bold=True)
+
+        # Write column headers
+        rsd_headers = df_standard_rsd.columns.tolist()
+        ws2.append(rsd_headers)
+        for cell in ws2[4]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+        # Write data rows
+        for _, row in df_standard_rsd.iterrows():
+            ws2.append(row.tolist())
+
+        # Add acceptance criteria
+        ws2.append([])
+        ws2.append(["Acceptance Criteria:"])
+        ws2["A7"].font = Font(bold=True)
+        ws2.append(["Standard RSD", "≤ 3.0%"])
+        ws2.append(["Check Standard % Recovery", "Within ±15% of theoretical value"])
+
+        # Auto-adjust column widths
+        for column in ws2.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws2.column_dimensions[column_letter].width = adjusted_width
+
+        # Save to BytesIO buffer
+        buffer = BytesIO()
+        wb.save(buffer)
+        byte_content = buffer.getvalue()
+
+        # Write file using context
+        context.write_file(
+            content=byte_content,
+            file_name=output_file_name,
+            file_category="PROCESSED",
+        )
+
+        logger.log(
+            {"message": f"Excel file saved as '{output_file_name}' successfully.", "level": "info"}
+        )
+
+    except Exception as e:
+        logger.log(
+            {"message": f"Error saving Excel file: {str(e)}", "level": "error"}
+        )
+
+
+def save_system_suitability_to_csv(
+    df_check_standards: pd.DataFrame,
+    df_standard_rsd: pd.DataFrame,
+    output_file_name: str,
+    context,
+    logger
+) -> None:
+    """
+    Save check standards and system suitability checks to a CSV file.
+
+    Args:
+        df_check_standards (pd.DataFrame): DataFrame containing check standards data
+        df_standard_rsd (pd.DataFrame): DataFrame containing standard RSD data
+        output_file_name (str): Name of the output file
+        context: Context object for file operations
+        logger: Logger object for logging messages
+    """
+    try:
+        buffer = StringIO()
+
+        # Write Check Standards section
+        buffer.write("Check Standards - % Recovery\n")
+        buffer.write("\n")
+        df_check_standards.to_csv(buffer, index=False)
+        buffer.write("\n\n")
+
+        # Write System Suitability section
+        buffer.write("System Suitability Checks\n")
+        buffer.write("\n")
+        buffer.write("Standard RSD Check\n")
+        df_standard_rsd.to_csv(buffer, index=False)
+        buffer.write("\n")
+
+        # Write acceptance criteria
+        buffer.write("Acceptance Criteria:\n")
+        buffer.write("Standard RSD,≤ 3.0%\n")
+        buffer.write("Check Standard % Recovery,Within ±15% of theoretical value\n")
+
+        byte_content = buffer.getvalue().encode("utf-8")
+
+        # Write file using context
+        context.write_file(
+            content=byte_content,
+            file_name=output_file_name,
+            file_category="PROCESSED",
+        )
+
+        logger.log(
+            {"message": f"System suitability CSV saved as '{output_file_name}' successfully.", "level": "info"}
+        )
+
+    except Exception as e:
+        logger.log(
+            {"message": f"Error saving system suitability CSV: {str(e)}", "level": "error"}
+        )
+
+
 # -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
@@ -905,6 +1088,22 @@ def main(input: dict, context: object) -> None:
         )
         save_csv(unique_df, f"{file_name}.csv", context=context, logger=logger)
 
+        # Save system suitability data to Excel and CSV
+        save_system_suitability_to_excel(
+            df_check_standard,
+            df_standard_rsd,
+            f"{file_name}_SystemSuitability.xlsx",
+            context,
+            logger
+        )
+        save_system_suitability_to_csv(
+            df_check_standard,
+            df_standard_rsd,
+            f"{file_name}_SystemSuitability.csv",
+            context,
+            logger
+        )
+
     else:
         for df_group in output_df:
             if df_group.empty:
@@ -923,3 +1122,19 @@ def main(input: dict, context: object) -> None:
                 df_group, df_check_standard, df_standard_rsd, file_name, context, logger
             )
             save_csv(unique_df, f"{file_name}.csv", context=context, logger=logger)
+
+            # Save system suitability data to Excel and CSV
+            save_system_suitability_to_excel(
+                df_check_standard,
+                df_standard_rsd,
+                f"{file_name}_SystemSuitability.xlsx",
+                context,
+                logger
+            )
+            save_system_suitability_to_csv(
+                df_check_standard,
+                df_standard_rsd,
+                f"{file_name}_SystemSuitability.csv",
+                context,
+                logger
+            )
